@@ -8,6 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from PIL import Image
 
 # --- KONFIGURASI UI/UX ---
 st.set_page_config(page_title="Age-Invariant Face Recognition", layout="wide")
