@@ -86,7 +86,7 @@ with tab1:
         st.warning("⚠️ Folder 'dataset' tidak ditemukan atau kosong. Silakan buat folder 'dataset' dan isi dengan gambar wajah.")
     else:
         # Melatih PCA [cite: 565-567]
-        pca = PCA(n_components=50) # Mengambil 50 komponen utama [cite: 574]
+        pca = PCA(n_components=3) # Mengambil 50 komponen utama [cite: 574]
         X_train_pca = pca.fit_transform(X_train)
         X_test_pca = pca.transform(X_test)
         
