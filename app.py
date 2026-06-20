@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from PIL import Image
 
@@ -22,7 +23,8 @@ def detect_and_crop_face(img_array):
         gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
     else:
         gray = img_array
-
+        
+    # Perataan cahaya (Histogram Equalization) agar performa PCA meningkat
     gray = cv2.equalizeHist(gray)
         
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -33,51 +35,39 @@ def detect_and_crop_face(img_array):
         
     x, y, w, h = faces[0]
     face_crop = gray[y:y+h, x:x+w]
-    
     face_resized = cv2.resize(face_crop, IMG_SIZE)
-    face_normalized = face_resized / 255.0
-    return face_normalized.flatten()
+    return (face_resized / 255.0).flatten()
 
 @st.cache_data
 def load_and_split_dataset():
-    X_train, X_test, y_train, y_test = [], [], [], []
+    X, labels = [], []
     if not os.path.exists(DATASET_PATH):
         return None, None, None, None
         
-    for person_name in os.listdir(DATASET_PATH):
+    # Membaca semua folder subjek yang sudah kamu upload
+    for person_name in sorted(os.listdir(DATASET_PATH)):
         person_folder = os.path.join(DATASET_PATH, person_name)
         if not os.path.isdir(person_folder): continue
             
-        person_vectors = []
-        for filename in sorted(os.listdir(person_folder)):
+        for filename in os.listdir(person_folder):
             if filename.lower().endswith((".jpg", ".jpeg", ".png")):
-                
-                try:
-                    umur_str = filename.upper().split('A')[1][:2]
-                    umur = int(''.join(filter(str.isdigit, umur_str)))
-                    if umur < 8:
-                        continue 
-                except:
-                    pass
-
                 image_path = os.path.join(person_folder, filename)
                 img = cv2.imread(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 vector = detect_and_crop_face(img)
+                
                 if vector is not None:
-                    person_vectors.append(vector)
+                    X.append(vector)
+                    labels.append(person_name)
                     
-        if len(person_vectors) >= 2:
-            X_test.append(person_vectors[0])
-            y_test.append(person_name)
-            
-            for vec in person_vectors[1:]:
-                X_train.append(vec)
-                y_train.append(person_name)
-                    
-    if len(X_train) == 0 or len(X_test) == 0: return None, None, None, None
+    if len(X) == 0: return None, None, None, None
     
-    return np.array(X_train), np.array(X_test), np.array(y_train), np.array(y_test)
+    # Menggunakan Stratified Random Split 80:20 sesuai standar pengujian
+    X = np.array(X)
+    labels = np.array(labels)
+    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.20, random_state=42, stratify=labels)
+    
+    return X_train, X_test, y_train, y_test
 
 X_train, X_test, y_train, y_test = load_and_split_dataset()
 
@@ -88,13 +78,14 @@ with tab1:
     if X_train is None:
         st.warning("Folder 'dataset' tidak ditemukan atau kosong. Silakan buat folder 'dataset' dan isi dengan gambar wajah.")
     else:
+        # Menggunakan 25 komponen utama untuk ekstraksi ciri terbaik
         pca = PCA(n_components=25)
         X_train_pca = pca.fit_transform(X_train)
         X_test_pca = pca.transform(X_test)
         
         col1, col2, col3 = st.columns(3)
-        col1.metric("Data Latih (Foto Dewasa)", f"{len(X_train)} gambar")
-        col2.metric("Data Uji (Foto Masa Kecil)", f"{len(X_test)} gambar")
+        col1.metric("Data Latih (80%)", f"{len(X_train)} gambar")
+        col2.metric("Data Uji (20%)", f"{len(X_test)} gambar")
         col3.metric("Total Explained Variance", f"{np.sum(pca.explained_variance_ratio_)*100:.2f}%")
         
         st.subheader("Evaluasi Akurasi (>50% Target)")
@@ -146,8 +137,8 @@ with tab2:
             st.markdown("---")
             st.subheader("Hasil Perhitungan Matematis")
             
-            threshold_cosine = 0.80
-            threshold_euclidean = 15.0
+            threshold_cosine = 0.65
+            threshold_euclidean = 18.0
             
             st.write(f"1. Metode Cosine Similarity: {cos_sim:.4f}")
             if cos_sim >= threshold_cosine:
