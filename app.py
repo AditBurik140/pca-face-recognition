@@ -24,7 +24,7 @@ def detect_and_crop_face(img_array):
     else:
         gray = img_array
         
-    # Perataan cahaya (Histogram Equalization) agar performa PCA meningkat
+    # Perataan cahaya (Histogram Equalization) wajib untuk foto jadul
     gray = cv2.equalizeHist(gray)
         
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -44,13 +44,25 @@ def load_and_split_dataset():
     if not os.path.exists(DATASET_PATH):
         return None, None, None, None
         
-    # Membaca semua folder subjek yang sudah kamu upload
     for person_name in sorted(os.listdir(DATASET_PATH)):
         person_folder = os.path.join(DATASET_PATH, person_name)
         if not os.path.isdir(person_folder): continue
             
-        for filename in os.listdir(person_folder):
+        for filename in sorted(os.listdir(person_folder)):
             if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+                
+                # --- FILTER UMUR: HANYA MENGAMBIL UMUR 5 TAHUN KE ATAS ---
+                try:
+                    umur_str = filename.upper().split('A')[1][:2]
+                    umur = int(''.join(filter(str.isdigit, umur_str)))
+                    # Jika umur di bawah 5 tahun (0-4 tahun), lewati foto ini
+                    if umur < 5:
+                        continue 
+                except:
+                    # Abaikan error jika nama file tidak menggunakan pola angka FG-NET
+                    pass
+                # ---------------------------------------------------------
+
                 image_path = os.path.join(person_folder, filename)
                 img = cv2.imread(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -62,10 +74,19 @@ def load_and_split_dataset():
                     
     if len(X) == 0: return None, None, None, None
     
-    # Menggunakan Stratified Random Split 80:20 sesuai standar pengujian
     X = np.array(X)
     labels = np.array(labels)
-    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.20, random_state=42, stratify=labels)
+    
+    # Memastikan ada cukup data untuk dibagi (minimal 2 foto per kelas) sebelum di-split
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, labels, test_size=0.20, random_state=42, stratify=labels
+        )
+    except ValueError:
+        # Fallback jika ada folder yang fotonya tinggal 1 setelah difilter
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, labels, test_size=0.20, random_state=42
+        )
     
     return X_train, X_test, y_train, y_test
 
@@ -76,9 +97,9 @@ tab1, tab2 = st.tabs(["EDA & Laporan Model (Data Latih/Uji)", "Demo Uji Kemiripa
 with tab1:
     st.header("Exploratory Data Analysis & Evaluasi PCA")
     if X_train is None:
-        st.warning("Folder 'dataset' tidak ditemukan atau kosong. Silakan buat folder 'dataset' dan isi dengan gambar wajah.")
+        st.warning("Folder 'dataset' tidak ditemukan atau data wajah tidak valid. Silakan periksa folder dataset.")
     else:
-        # Menggunakan 25 komponen utama untuk ekstraksi ciri terbaik
+        # Menggunakan 25 komponen untuk menghindari overfitting maupun underfitting
         pca = PCA(n_components=25)
         X_train_pca = pca.fit_transform(X_train)
         X_test_pca = pca.transform(X_test)
@@ -98,8 +119,8 @@ with tab1:
         y_pred_euclidean = [y_train[np.argmin(dist)] for dist in euclidean_dist_matrix]
         acc_euclidean = accuracy_score(y_test, y_pred_euclidean) * 100
         
-        st.write(f"Akurasi Cosine Similarity: {acc_cosine:.2f}%")
-        st.write(f"Akurasi Euclidean Distance: {acc_euclidean:.2f}%")
+        st.write(f"Akurasi Cosine Similarity: **{acc_cosine:.2f}%**")
+        st.write(f"Akurasi Euclidean Distance: **{acc_euclidean:.2f}%**")
         
         st.subheader("Visualisasi Mean Face")
         mean_face = pca.mean_.reshape(IMG_SIZE)
@@ -114,7 +135,7 @@ with tab2:
     
     col_img1, col_img2 = st.columns(2)
     with col_img1:
-        upload_kecil = st.file_uploader("Unggah Foto Masa Kecil", type=['jpg', 'jpeg', 'png'])
+        upload_kecil = st.file_uploader("Unggah Foto Masa Kecil (≥ 5 Tahun)", type=['jpg', 'jpeg', 'png'])
     with col_img2:
         upload_dewasa = st.file_uploader("Unggah Foto Dewasa", type=['jpg', 'jpeg', 'png'])
         
@@ -126,7 +147,7 @@ with tab2:
         vec_dewasa = detect_and_crop_face(img_dewasa)
         
         if vec_kecil is None or vec_dewasa is None:
-            st.error("Wajah tidak terdeteksi pada salah satu atau kedua foto. Coba foto yang lebih jelas!")
+            st.error("Wajah tidak terdeteksi pada salah satu atau kedua foto. Coba gunakan foto yang lebih jelas.")
         else:
             pca_kecil = pca.transform(vec_kecil.reshape(1, -1))
             pca_dewasa = pca.transform(vec_dewasa.reshape(1, -1))
