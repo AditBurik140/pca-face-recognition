@@ -14,7 +14,6 @@ st.set_page_config(page_title="Age-Invariant Face Recognition", layout="wide")
 st.title("Sistem Deteksi Kemiripan Wajah Lintas Usia (PCA)")
 st.write("Menggunakan algoritma Principal Component Analysis (Eigenfaces) dengan deteksi wajah Haar Cascade.")
 
-# Standar ukuran gambar sesuai panduan PDF
 IMG_SIZE = (100, 100) 
 DATASET_PATH = "dataset"
 
@@ -48,9 +47,17 @@ def load_and_split_dataset():
         if not os.path.isdir(person_folder): continue
             
         person_vectors = []
-        # Menggunakan sorted agar file diurutkan berdasarkan nama (001A02.jpg akan dibaca lebih dulu)
         for filename in sorted(os.listdir(person_folder)):
             if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+                
+                try:
+                    umur_str = filename.upper().split('A')[1][:2]
+                    umur = int(''.join(filter(str.isdigit, umur_str)))
+                    if umur < 8:
+                        continue 
+                except:
+                    pass
+
                 image_path = os.path.join(person_folder, filename)
                 img = cv2.imread(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -58,7 +65,6 @@ def load_and_split_dataset():
                 if vector is not None:
                     person_vectors.append(vector)
                     
-        # Trik Pemisahan Dinamis: Index 0 (foto termuda) jadi data uji, sisanya data latih
         if len(person_vectors) >= 2:
             X_test.append(person_vectors[0])
             y_test.append(person_name)
@@ -71,7 +77,6 @@ def load_and_split_dataset():
     
     return np.array(X_train), np.array(X_test), np.array(y_train), np.array(y_test)
 
-# Menjalankan pemuatan dataset
 X_train, X_test, y_train, y_test = load_and_split_dataset()
 
 tab1, tab2 = st.tabs(["EDA & Laporan Model (Data Latih/Uji)", "Demo Uji Kemiripan (Foto Baru)"])
@@ -139,7 +144,6 @@ with tab2:
             st.markdown("---")
             st.subheader("Hasil Perhitungan Matematis")
             
-            # Penetapan nilai batas kemiripan
             threshold_cosine = 0.80
             threshold_euclidean = 15.0
             
