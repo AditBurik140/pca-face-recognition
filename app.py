@@ -158,7 +158,7 @@ with tab2:
             st.markdown("---")
             st.subheader("Hasil Perhitungan Matematis")
             
-            threshold_cosine = 0.65
+            threshold_cosine = 0.50
             threshold_euclidean = 18.0
             
             st.write(f"1. Metode Cosine Similarity: {cos_sim:.4f}")
