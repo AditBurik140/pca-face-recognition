@@ -81,7 +81,7 @@ with tab1:
     if X_train is None:
         st.warning("Folder 'dataset' tidak ditemukan atau kosong. Silakan buat folder 'dataset' dan isi dengan gambar wajah.")
     else:
-        pca = PCA(n_components=50)
+        pca = PCA(n_components=25)
         X_train_pca = pca.fit_transform(X_train)
         X_test_pca = pca.transform(X_test)
         
